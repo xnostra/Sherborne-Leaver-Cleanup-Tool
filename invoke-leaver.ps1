@@ -20,7 +20,8 @@
 #>
 
 $repoRaw    = "https://raw.githubusercontent.com/xnostra/Sherborne-Leaver-Cleanup-Tool/main"
-$scriptUrl  = "$repoRaw/Disable-RemoveLicenses.ps1"
+# The version query bypasses stale GitHub CDN responses during an update.
+$scriptUrl  = "$repoRaw/Disable-RemoveLicenses.ps1?v=3193ac9"
 
 # Permanent install folder so undo files, logs, and config persist
 $installDir = Join-Path ([Environment]::GetFolderPath('Desktop')) "Sherborne-Leaver-Cleanup-Tool"
