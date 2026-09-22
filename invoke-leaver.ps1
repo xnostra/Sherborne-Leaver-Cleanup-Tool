@@ -68,7 +68,7 @@ try {
         $markerPath = Join-Path $installDir '.launch_marker'
         Remove-Item $markerPath -Force -ErrorAction SilentlyContinue
 
-        $innerCommand   = "try { '' | Out-File -FilePath '$markerPath' -Force -Encoding ascii } catch {}; & '$scriptPath'"
+        $innerCommand   = "try { '' | Out-File -FilePath '$markerPath' -Force -Encoding ascii } catch {}; & '$scriptPath'; Write-Host ''; Read-Host 'Press Enter to close'"
         $encodedCommand = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($innerCommand))
         $relaunchArgs   = "-NoProfile -STA -ExecutionPolicy Bypass -EncodedCommand $encodedCommand"
 
