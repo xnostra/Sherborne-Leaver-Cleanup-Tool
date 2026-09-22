@@ -41,21 +41,17 @@ try {
     Write-Host "  $installDir" -ForegroundColor Gray
     Write-Host ""
 
-    # Download the latest main script into the permanent folder
-    Invoke-RestMethod -Uri $scriptUrl -UseBasicParsing -ErrorAction Stop | Out-File -FilePath $scriptPath -Encoding UTF8 -Force
+    # Download without adding a second UTF-8 BOM. The GitHub source already has
+    # one; piping Invoke-RestMethod into Out-File on Windows PowerShell adds
+    # another and makes the opening <# documentation comment invalid syntax.
+    $downloadedScript = (Invoke-WebRequest -Uri $scriptUrl -UseBasicParsing -ErrorAction Stop).Content
+    $downloadedScript = $downloadedScript.TrimStart([char]0xFEFF)
+    [System.IO.File]::WriteAllText($scriptPath, $downloadedScript, (New-Object System.Text.UTF8Encoding($false)))
 
     # Keep the child window open so startup errors (module installation, sign-in,
     # network, or permissions) remain visible instead of making the one-liner
     # appear to do nothing.
     $psArgs = "-NoProfile -STA -ExecutionPolicy Bypass -NoExit -File `"$scriptPath`""
-
-    # Some managed PCs report a scheduled-task relaunch as successful while
-    # suppressing the resulting interactive window. In that case, run visibly
-    # in the current console so the tool and any sign-in/startup error are shown.
-    if ($isAdmin) {
-        & $scriptPath -Relaunched
-        return
-    }
 
     if ($isAdmin) {
         # PowerShell is elevated, but this tool's Microsoft sign-in breaks under admin on most
