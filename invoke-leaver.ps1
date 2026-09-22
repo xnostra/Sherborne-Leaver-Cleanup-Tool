@@ -44,7 +44,10 @@ try {
     # Download the latest main script into the permanent folder
     Invoke-RestMethod -Uri $scriptUrl -UseBasicParsing -ErrorAction Stop | Out-File -FilePath $scriptPath -Encoding UTF8 -Force
 
-    $psArgs = "-NoProfile -STA -ExecutionPolicy Bypass -File `"$scriptPath`""
+    # Keep the child window open so startup errors (module installation, sign-in,
+    # network, or permissions) remain visible instead of making the one-liner
+    # appear to do nothing.
+    $psArgs = "-NoProfile -STA -ExecutionPolicy Bypass -NoExit -File `"$scriptPath`""
 
     if ($isAdmin) {
         # PowerShell is elevated, but this tool's Microsoft sign-in breaks under admin on most
