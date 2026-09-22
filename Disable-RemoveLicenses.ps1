@@ -823,6 +823,33 @@ function Find-LicenseAssigningGroups {
     param($UserId, $UserGroups)
     $cache = Get-LicenseAssigningGroupCache
     $foundGroups = @()
+
+    # This is Microsoft's authoritative per-user answer.  It tells us the exact
+    # group that assigned each licence, rather than inferring it from membership.
+    # That matters after the normal group-cleanup pass has already removed the
+    # user, when a second removal returns ResourceNotFound even though the licence
+    # is simply waiting for Entra's background processor to catch up.
+    if ($UserId) {
+        try {
+            $states = @((Get-MgUser -UserId $UserId -Property 'licenseAssignmentStates' -ErrorAction Stop).LicenseAssignmentStates)
+            foreach ($state in $states) {
+                $groupId = "$($state.AssignedByGroup)"
+                if (-not $groupId) { continue }
+                if ($cache.ContainsKey($groupId)) {
+                    $foundGroups += $cache[$groupId]
+                } else {
+                    try {
+                        $group = Get-MgGroup -GroupId $groupId -Property 'id,displayName,assignedLicenses' -ErrorAction Stop
+                        $foundGroups += [pscustomobject]@{ Id = $group.Id; Name = $group.DisplayName; Licenses = Get-LicNames @($group.AssignedLicenses.SkuId | Where-Object { $_ }) }
+                    } catch {
+                        $foundGroups += [pscustomobject]@{ Id = $groupId; Name = "licence group $groupId"; Licenses = '' }
+                    }
+                }
+            }
+            if ($foundGroups.Count -gt 0) { return @($foundGroups | Select-Object -Unique) }
+        } catch { }
+    }
+
     if ($UserGroups) {
         foreach ($ug in $UserGroups) {
             if ($cache.ContainsKey($ug.Id)) { $foundGroups += $cache[$ug.Id] }
@@ -980,6 +1007,14 @@ function Invoke-AccountCleanup {
                             $removedNames += $lg.Name
                         } catch {
                             $gmsg = "$($_.Exception.Message)"
+                            if ($gmsg -match 'Request_ResourceNotFound|does not exist') {
+                                # This normally means the ordinary group-cleanup pass above has
+                                # already removed the user.  Entra's group-licensing processor
+                                # can take time to release the SKU, so it is not a failed cleanup.
+                                Write-Host "      already removed from license group: $($lg.Name); requesting licence reprocessing..." -ForegroundColor DarkGray
+                                $removedNames += "$($lg.Name) (already removed; release pending)"
+                                continue
+                            }
                             Write-Host "      could not remove from $($lg.Name): $gmsg" -ForegroundColor Yellow
                             # Give a specific reason where we can recognise it, instead of a bare "check permissions"
                             if ($gmsg -match 'on-premises|write scope|being synchronized') {
@@ -991,6 +1026,16 @@ function Invoke-AccountCleanup {
                             } else {
                                 $failedNotes += "$($lg.Name) ($gmsg)"
                             }
+                        }
+                    }
+                    if ($removedNames.Count -gt 0 -and (Get-Command Invoke-MgLicenseUser -ErrorAction SilentlyContinue)) {
+                        try {
+                            # Ask Entra to process the changed group membership now, instead of
+                            # waiting for its normal background licensing cycle.
+                            Invoke-MgLicenseUser -UserId $User.Id -ErrorAction Stop | Out-Null
+                            $done += 'requested immediate Entra reprocessing of group-based license removal'
+                        } catch {
+                            $done += "could not request immediate group-license reprocessing ($($_.Exception.Message)); Entra will retry automatically"
                         }
                     }
                     if ($removedNames.Count -gt 0) {
