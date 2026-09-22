@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
   All-in-one leaver cleanup tool for Microsoft 365.
   Disables accounts, removes licenses, removes group/distribution list/Teams memberships,
