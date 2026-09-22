@@ -49,6 +49,14 @@ try {
     # appear to do nothing.
     $psArgs = "-NoProfile -STA -ExecutionPolicy Bypass -NoExit -File `"$scriptPath`""
 
+    # Some managed PCs report a scheduled-task relaunch as successful while
+    # suppressing the resulting interactive window. In that case, run visibly
+    # in the current console so the tool and any sign-in/startup error are shown.
+    if ($isAdmin -and $env:LEAVER_TOOL_FORCE_VISIBLE -eq '1') {
+        & $scriptPath -Relaunched
+        return
+    }
+
     if ($isAdmin) {
         # PowerShell is elevated, but this tool's Microsoft sign-in breaks under admin on most
         # machines. Try to launch the tool as the NORMAL interactive user via a one-off scheduled
