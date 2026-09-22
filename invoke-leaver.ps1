@@ -52,7 +52,7 @@ try {
     # Some managed PCs report a scheduled-task relaunch as successful while
     # suppressing the resulting interactive window. In that case, run visibly
     # in the current console so the tool and any sign-in/startup error are shown.
-    if ($isAdmin -and $env:LEAVER_TOOL_FORCE_VISIBLE -eq '1') {
+    if ($isAdmin) {
         & $scriptPath -Relaunched
         return
     }
